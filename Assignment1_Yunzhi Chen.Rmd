@@ -1,0 +1,178 @@
+---
+title: "Assignment1"
+author: "Yunzhi Chen 32051018"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, warning = FALSE, message = FALSE, echo = FALSE}
+library(tidyverse)
+library(faraway)
+library(visreg)
+library(broom)
+library(patchwork)
+library(dplyr)
+```
+
+# Q1
+```{r read_data}
+dataA1 <- read_csv(here::here("dataA1_etc3580.csv"))
+
+dataA1 <- dataA1 %>% mutate(race = factor(race, levels = c("white", "black", "other"), 
+                                                labels = c("white", "black", "other")),
+                            smoke = factor(smoke, levels = c("smoker", "nonsmoker"), 
+                                                  labels = c("smoker", "nonsmoker")))
+```
+
+# Q2
+```{r plots}
+p1 <- dataA1 %>% ggplot(aes(x = age,
+                            y = bwt)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = bquote("Figure1"))
+
+p2 <- dataA1 %>% ggplot(aes(x = race,
+                            y = bwt)) +
+  geom_boxplot() +
+  labs(title = bquote("Figure2"))
+
+p3 <- dataA1 %>% ggplot(aes(x = smoke,
+                            y = bwt)) +
+  geom_boxplot() +
+  labs(title = bquote("Figure3"))
+
+p1+p2+p3
+```
+
+Figure1 shows that overall, it seems that there is no relationship between maternal age and infant birth weight. A substantial variability in birth weight exists among each age group. As for ages 36 to 40 years and older, there are no data except one outlier, and this outlier can probably be ignored in the analysis. 
+
+Figure2 illustrates that there may be some differences in birth weight between racial groups. Specifically, white race has higher median birth weights than black and other races, while the rest groups of race have the similarly value of median birth weights of babies.
+
+Figure3 boxplot shows that infants born to mothers who smoke tend to have lower birth weights than non-smoking mothers. In addition, the birth weights have more variation of nonsmoking mothers group.
+
+# Q3
+```{r linear_model}
+lmod <- lm(bwt ~ age + race + smoke,
+           data = dataA1) 
+
+summary(lmod) 
+```
+
+The estimated coefficient for age is 1.999, which suggests that, on average, birth weight increases by 1.999 grams for every additional year of age, holding all other factors constant, which indicates a very weak positive relationship.
+
+The estimated coefficient for nonsmokers is positive (425.556), indicates that, on average, infants born to mothers who do not smoke have birth weights that are 425.556 grams higher than those born to mothers who smoke, holding all other factors constant.
+
+# Q4
+```{r linear_model2}
+lmod2 <- lm(bwt ~ age + race + smoke + race * smoke,
+           data = dataA1) 
+summary(lmod2)
+
+visreg2d(lmod2, "race", "smoke")
+```
+
+According to the color blocks, particularly pronounced for black infants born to smoking mothers, who have the lowest predicted birth weights overall, while white non-smoking mothers tend to have the highest birth weights babies.
+
+# Q5
+```{r test}
+anova(lmod, lmod2)
+```
+
+H0: The interaction term does not significantly improve the model fit; 
+H1: The interaction term does significantly improve the model fit.
+
+By using the anova function to check if the interaction is significant. we can conclude from the output that the p-value is 0.1103, which is not less than 0.05, so we can not reject the null hypothesis, and the conclusion is that the interaction term is not significant.
+
+# Q6
+```{r select}
+fit <- lm(bwt ~ age + race + smoke,
+           data = dataA1) 
+fit2 <- lm(bwt ~ I(age^2) + race + smoke,
+           data = dataA1)
+
+AIC(fit)
+AIC(fit2)
+```
+As we can see from the result, fit 2 has slightly less value of AIC, which indicates the quadratic relation between age and bwt is better.
+
+# Q7
+```{r prob}
+dataA1_prob <- dataA1 %>%
+  mutate(prob = ifelse(bwt >= 2500, 0, 1))
+
+glm <- glm(prob ~ age + race + smoke,
+             family = binomial,
+             data = dataA1_prob)
+summary(glm)
+
+pred_data <- data.frame(age = 30, 
+                       race = "black", 
+                       smoke = "nonsmoker")
+
+prob_low_bwt <- predict(glm, pred_data, type = "response")
+prob_low_bwt
+```
+
+The predicted probability of low birth weight for a baby with a 30 year old black mother who does not smoke is 26.1%.
+
+# Q8
+```{r, warning = FALSE, message = FALSE}
+dataA1_agecat <- dataA1 %>% mutate(agecat = ifelse(age <= 20, "20 or younger",
+                                                   ifelse(age <= 30, "age between 21-30", 
+                                                                     "older than 30")))
+dataA1_groups <- dataA1_agecat %>%
+  group_by(agecat,
+           race,
+           smoke) %>%
+  summarise(lower_bwt = sum(bwt > 2500),
+            higher_bwt = sum(bwt < 2500))
+
+```
+
+# Q9
+```{r}
+glm2 <- glm(cbind(lower_bwt, higher_bwt) ~ agecat + race + smoke,
+            family = binomial,
+            data = dataA1_groups)
+summary(glm2)
+
+# Odds ratios:
+or <- round((exp(coef(glm2)[-1]) - 1) * 100, 1)
+increase <- (or>0)
+```
+As we can see from the summary, the variables race and smoke are significant at 5% level. By analyzing the results using odds ratios, we can interpret the coefficients for race and smoke:
+
+- odds of saying that the number of low birth weight babies is wrong `r ifelse(increase[3],"increase","decrease")` by `r abs(or[3])`% with the race of black when all other variables remain constant.
+- odds of saying that the number of low birth weight babies is wrong `r ifelse(increase[4],"increase","decrease")` by `r abs(or[4])`% with other races when all other variables remain constant.
+- odds of saying that the number of low birth weight babies is wrong `r ifelse(increase[5],"increase","decrease")` by `r abs(or[5])`% with non-smoking mothers when all other variables remain constant.
+
+# Q10
+Although the same age, race, and smoke are used as predictors in all three questions, the estimated coefficients have different signs across the estimated regressions for the following reasons.
+
+- The sample size and variability of the data affect the signs of the estimated coefficients due to the slight difference in the data used in each model. Small sample sizes or high variability of the data can lead to unstable estimates and may result in different signs of the estimated coefficients in different regression models.
+- Due to the different interactions between predictor variables in different models.
+- The different treatment of the response variables: Q3 is modeled purely using a linear model, Q7 is the predicted likelihood, and Q9 is treating low-weight infants to the binary response, leading to different signs of the estimated coefficients.
+
+# Q11
+```{r}
+glm3 <- glm(cbind(lower_bwt, higher_bwt) ~ agecat + race + smoke, 
+            family = quasibinomial, 
+            data = dataA1_groups)
+summary(glm3)
+
+pchisq(deviance(glm3), df.residual(glm3))
+
+anova(glm2, glm3, test = "F")
+```
+
+By using Quasi-binomial to adjust for overdispersion in this question, we can see that the results are the same when comparing the generated model with Q9. I believe the two reasons why overdispersion may not be a problem are:
+
+- Mean pi determines the variance pi(1 − pi).
+- Percentage observations pi equal to 1 and 1 − pi to 0.
