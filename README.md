@@ -1,5 +1,4 @@
-# Statistic-on-maternal-smoking-and-the-baby-s-health
-
+# Statistic-on-MaternalSmoking-and-BirthWeight
 ## Task
 Consider the question whether there is a link between maternal smoking and the baby’s health. The goal of this assignment is to model birth weight, which is an important indicator of a baby’s health. 
 
